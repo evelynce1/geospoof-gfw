@@ -20,6 +20,8 @@
   </p>
 </div>
 
+[中文说明](README.zh-CN.md)
+
 GeoSpoof now comes in two parts:
 
 - **Browser extension** (free & open source) — stops websites from geolocating you by overriding the Geolocation API, timezone, `Intl`, WebRTC, and every other signal, so your browser reports a location you choose. Firefox, Chrome, and Safari.
