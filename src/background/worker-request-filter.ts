@@ -120,7 +120,7 @@ import { buildStandaloneWorkerPayload } from "@/shared/worker-payload";
 import { resolvePageLocale } from "@/shared/locale/resolver";
 import { loadSettings } from "./settings";
 import { isRestrictedUrl } from "./tabs";
-import { computeEffectiveEnabled, computeEffectiveSiteLocations } from "@/shared/utils/scope";
+import { computeEffectiveSiteLocations } from "@/shared/utils/scope";
 import { resolveSiteSettings } from "@/shared/utils/site-locations";
 import { createLogger } from "@/shared/utils/debug-logger";
 
@@ -330,6 +330,11 @@ export function hasWorkerTimezoneSource(settings: Settings): boolean {
  * The timezone and locale come from the same per-site resolution the page
  * payload uses, so a worker and its page agree. Returns "" when there is
  * neither a timezone nor a locale to apply (leave the script unmodified).
+ * This builder deliberately does NOT check `resolution.enabled`: the
+ * scope gate (which now routes through `resolveSiteSettings`, including
+ * direct rules) is the only caller, and it only calls this for tabs it
+ * already decided to patch — exactly like the page payload, which still
+ * carries the main zone on a disabled tab for consumers to ignore.
  */
 export function workerPayloadFor(settings: Settings, pageUrl: string | undefined): string {
   const effective = resolveSiteSettings(settings, pageUrl, isRestrictedUrl).settings;
@@ -553,10 +558,11 @@ function readSecFetchDest(headers: HttpHeader[] | undefined): string | null {
  * unknown, defaults to "pass" (safe fallback).
  *
  * Scope gate (Req 11): a candidate "patch" is additionally gated on
- * `computeEffectiveEnabled` for the tab's top-level URL so the filter
+ * `resolveSiteSettings` for the tab's top-level URL so the filter
  * agrees with the background's per-tab decision. Out-of-scope tabs
- * (allowlist miss, denylist hit, restricted URL, or master off) and
- * unknown tabs (`tabId === -1`, no cached URL) classify as "pass".
+ * (allowlist miss, denylist hit, restricted URL, or master off),
+ * mainland-direct tabs, and unknown tabs (`tabId === -1`, no cached
+ * URL) classify as "pass".
  */
 function classifyRequest(details: WebRequestDetailsWithHeaders): Decision {
   const dest = readSecFetchDest(details.requestHeaders);
@@ -590,19 +596,14 @@ function classifyRequest(details: WebRequestDetailsWithHeaders): Decision {
   // Scope gate (Req 11): consult the single source of truth so the worker
   // filter agrees with the background's per-tab decision for this initiating
   // document. Out-of-scope (allowlist miss / denylist hit / restricted / master
-  // off) ⇒ leave the worker script unmodified. When settings haven't loaded
-  // yet, fall back to "pass".
+  // off) or mainland-direct ⇒ leave the worker script unmodified. When
+  // settings haven't loaded yet, fall back to "pass". This used to call
+  // `computeEffectiveEnabled` directly, which knows nothing about direct
+  // rules; routing through `resolveSiteSettings` keeps workers in step
+  // with pages.
   if (!cachedSettings) return "pass";
-  const effective = computeEffectiveEnabled({
-    masterEnabled: cachedSettings.enabled,
-    scopeMode: cachedSettings.scopeMode,
-    allowlist: cachedSettings.allowlist,
-    denylist: cachedSettings.denylist,
-    proFeaturesBlocked: cachedSettings.proFeaturesBlocked,
-    topLevelUrl: pageUrl,
-    isRestricted: isRestrictedUrl,
-  });
-  if (!effective) return "pass"; // out-of-scope → unmodified
+  const resolution = resolveSiteSettings(cachedSettings, pageUrl, isRestrictedUrl);
+  if (!resolution.enabled) return "pass"; // out-of-scope or direct-rule → unmodified
 
   // Same-site gate: exact origin (covers localhost / IP / single-label hosts)
   // or same registrable domain (covers sibling sub-domains).

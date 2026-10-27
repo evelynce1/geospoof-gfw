@@ -68,6 +68,8 @@ const settingsArb: fc.Arbitrary<Settings> = fc.record({
   // locale-resolver.property.test.ts.
   localeSpoofing: fc.constant({ mode: "off" as const }),
   siteLocations: fc.constant([]),
+  directRulesEnabled: fc.constant(true),
+  directRules: fc.constant([]),
 });
 
 describe("Property 7: State restoration on re-awakening", () => {

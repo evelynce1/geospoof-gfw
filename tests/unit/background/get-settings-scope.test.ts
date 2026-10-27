@@ -51,6 +51,8 @@ function makeSettings(overrides?: Partial<Settings>): Settings {
     precisionCadence: "never" as const,
     localeSpoofing: { mode: "off" as const },
     siteLocations: [],
+    directRulesEnabled: true,
+    directRules: [],
     ...overrides,
   };
 }

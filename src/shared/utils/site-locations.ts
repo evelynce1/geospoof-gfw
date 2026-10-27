@@ -1,19 +1,24 @@
 /**
  * Site locations: pattern grammar, precedence, resolution, and validation.
  *
- * Two independent axes decide what a page sees:
+ * Three independent axes decide what a page sees:
  *   1. Filters (allowlist/denylist) decide WHETHER GeoSpoof is on for the
  *      tab's top-level URL (`computeEffectiveEnabled`).
  *   2. A matching site location decides WHICH location it reports there.
+ *   3. A matching mainland-direct rule (geospoof-gfw) turns spoofing OFF
+ *      for that tab only, after site locations and before the main
+ *      location. It never changes the global switch or the main location.
  *
- * `resolveSiteSettings` is the only place the second axis is applied. Every
- * background consumer (page payloads, workers, Accept-Language, CDP, the
- * badge title) goes through it, so they can't disagree about a tab.
+ * `resolveSiteSettings` is the only place the second and third axes are
+ * applied. Every background consumer (page payloads, workers,
+ * Accept-Language, CDP, the badge title) goes through it, so they can't
+ * disagree about a tab.
  *
  * Pure: no `browser.*`, no storage, no clock.
  */
 
 import type {
+  DirectRule,
   Location,
   LocationName,
   Settings,
@@ -32,6 +37,7 @@ import {
   matchesPattern,
   parsePattern,
 } from "./scope";
+import { matchDirectRule } from "@/shared/rules/direct-rules";
 import { isValidIANATimezone } from "./type-guards";
 
 /** Maximum stored id length. */
@@ -156,16 +162,33 @@ export function matchSiteLocation(
 
 /** The per-tab decision: whether GeoSpoof is on, and with which settings. */
 export interface SiteResolution {
-  /** The tab's Effective_Enabled value (Filters, master switch, restricted URLs). */
+  /**
+   * Whether spoofing is on for this tab: Filters and the master switch
+   * AND no mainland-direct rule matched. A direct-rule tab reports
+   * `false` here while the global switch stays on, so consumers that
+   * check `enabled` (page payload, Accept-Language, CDP, badge) all
+   * turn off together for that tab.
+   */
   enabled: boolean;
   /** The applied site location, or null when the main location applies. */
   siteLocation: SiteLocation | null;
   /** The pattern that matched, or null. */
   matchedPattern: string | null;
   /**
+   * The mainland-direct rule that turned this tab off, or null. Null
+   * also when a site location wins over a direct rule, because then
+   * the rule did not apply. Consumers that need to tell "Filters off"
+   * apart from "direct rule off" (popup conflict hints, Accept-Language
+   * exclusion) check this field, not `enabled` alone.
+   */
+  directRule: DirectRule | null;
+  /**
    * The settings to build from. The SAME reference as the input unless a site
    * location applies; then a copy with `location`, `timezone`, and
    * `locationName` taken from the entry and every other field global.
+   * A direct-rule tab keeps the input reference: it only turns off
+   * (`enabled: false`), it does not change any location value, and
+   * consumers build nothing from a disabled tab's settings.
    */
   settings: Settings;
 }
@@ -174,6 +197,10 @@ export interface SiteResolution {
  * Resolve the effective settings for a tab whose top-level URL is
  * `topLevelUrl`. Filters run first: out of scope, no entry applies, so an
  * entry's coordinates can never reach a page Filters keep GeoSpoof off.
+ * Then a site location, then a mainland-direct rule. The order matters:
+ * a manual site location wins over a direct rule for the same tab, so a
+ * user who explicitly pinned a place to a mainland site keeps that place
+ * instead of silently losing it to a list rule.
  */
 export function resolveSiteSettings(
   settings: Settings,
@@ -190,7 +217,7 @@ export function resolveSiteSettings(
     isRestricted,
   });
   if (!enabled || !topLevelUrl) {
-    return { enabled, siteLocation: null, matchedPattern: null, settings };
+    return { enabled, siteLocation: null, matchedPattern: null, directRule: null, settings };
   }
 
   const entries = computeEffectiveSiteLocations(
@@ -198,22 +225,48 @@ export function resolveSiteSettings(
     settings.proFeaturesBlocked
   );
   const match = matchSiteLocation(topLevelUrl, entries);
-  if (match === null) {
-    return { enabled, siteLocation: null, matchedPattern: null, settings };
+  if (match !== null) {
+    const { entry } = match;
+    return {
+      enabled,
+      siteLocation: entry,
+      matchedPattern: match.pattern,
+      directRule: null,
+      settings: {
+        ...settings,
+        location: entry.location,
+        timezone: entry.timezone,
+        locationName: entry.locationName,
+      },
+    };
   }
 
-  const { entry } = match;
-  return {
-    enabled,
-    siteLocation: entry,
-    matchedPattern: match.pattern,
-    settings: {
-      ...settings,
-      location: entry.location,
-      timezone: entry.timezone,
-      locationName: entry.locationName,
-    },
-  };
+  // No site location: a mainland-direct rule turns this tab off.
+  // `directRulesEnabled !== false` (not a truthy check) so a settings
+  // object built before this field existed still defaults to on, like
+  // `DEFAULT_SETTINGS` and `validateSettings` do.
+  if (settings.directRulesEnabled !== false) {
+    let hostname: string | null = null;
+    try {
+      hostname = new URL(topLevelUrl).hostname;
+    } catch {
+      hostname = null;
+    }
+    if (hostname !== null) {
+      const directRule = matchDirectRule(hostname, settings.directRules ?? []);
+      if (directRule !== null) {
+        return {
+          enabled: false,
+          siteLocation: null,
+          matchedPattern: null,
+          directRule,
+          settings,
+        };
+      }
+    }
+  }
+
+  return { enabled, siteLocation: null, matchedPattern: null, directRule: null, settings };
 }
 
 // ─────────────────────────────── Popup helpers ───────────────────────────────

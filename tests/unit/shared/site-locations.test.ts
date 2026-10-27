@@ -381,7 +381,13 @@ describe("resolveSiteSettings", () => {
   it("returns the same reference when nothing matches", () => {
     const settings = makeSettings();
     const r = resolveSiteSettings(settings, "https://example.org/", isRestrictedUrl);
-    expect(r).toEqual({ enabled: true, siteLocation: null, matchedPattern: null, settings });
+    expect(r).toEqual({
+      enabled: true,
+      siteLocation: null,
+      matchedPattern: null,
+      directRule: null,
+      settings,
+    });
     expect(r.settings).toBe(settings);
   });
 

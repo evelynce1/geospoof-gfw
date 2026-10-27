@@ -14,6 +14,7 @@ import { wireDebuggerModeToggle } from "./debugger-mode";
 import { applyI18n, t, initI18n, resetI18nOverride, browserUiLanguage } from "./i18n";
 import { localizeWebsiteLinks } from "./website-links";
 import { initAccuracyControl } from "./accuracy";
+import { initDirectRules } from "./direct-rules";
 import { initPrecisionCadenceControl, initPrecisionControl } from "./precision";
 import { initLocaleControl } from "./locale";
 import { wireCoordinatePaste } from "./coord-paste";
@@ -661,6 +662,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Wire the accuracy control (Advanced accordion). State is restored later in
   // loadSettings() from the stored accuracySetting.
   initAccuracyControl();
+
+  // Wire the mainland-direct rules editor (Filters tab). State is
+  // restored later in loadSettings() from the stored directRules.
+  initDirectRules();
 
   // Wire the location-precision control (Advanced accordion). State is restored
   // later in loadSettings() from the stored locationPrecision.

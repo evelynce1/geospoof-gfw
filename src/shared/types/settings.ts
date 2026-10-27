@@ -191,6 +191,60 @@ export const MAX_SITE_LOCATIONS = 50;
 export const MAX_PATTERNS_PER_SITE_LOCATION = 10;
 
 /**
+ * A mainland-direct ("大陆直连") rule, added by the geospoof-gfw fork.
+ * Matching rules do NOT pick a location: they turn spoofing off for that
+ * tab only, so the page sees the real location and timezone. Everything
+ * else keeps the main (VPN-synced) location. Stage 1 only defines the
+ * type and the storage shape; the resolver wires it up in stage 2.
+ */
+export type DirectRuleKind = "domain" | "domain-suffix" | "domain-keyword" | "ipv4-cidr";
+
+/** Where a direct rule came from. `builtin` is shipped with the extension. */
+export type DirectRuleSource = "builtin" | "local" | "import";
+
+export interface DirectRule {
+  /** Unique identifier — `Date.now().toString()`, like `Favorite.id` */
+  id: string;
+  kind: DirectRuleKind;
+  /**
+   * Canonical value, as produced by `parseDirectRule` in
+   * `src/shared/rules/direct-rules.ts`:
+   *   - domain: exact host, e.g. `baidu.com`
+   *   - domain-suffix: apex + subdomains, e.g. `baidu.com`; a leading
+   *     `*.` means subdomains only, e.g. `*.baidu.com`
+   *   - domain-keyword: lowercased substring of the host, e.g. `baidu`
+   *   - ipv4-cidr: canonical network/prefix, e.g. `223.5.5.0/24`
+   */
+  value: string;
+  enabled: boolean;
+  source: DirectRuleSource;
+  /** Epoch milliseconds of the last save; the precedence tie-break */
+  updatedAt: number;
+}
+
+/** Maximum number of direct rules. Enforced on load, like `MAX_FAVORITES`. */
+export const MAX_DIRECT_RULES = 2000;
+
+/** Maximum stored direct-rule id length, matching the site-location cap. */
+export const MAX_DIRECT_RULE_ID_LENGTH = 64;
+
+/**
+ * Rules shipped with the extension. Only `.cn` for now: the rest of the
+ * mainland list (`.com` services such as baidu.com) comes from the user's
+ * own imported text in stage 3, not from a guessed built-in list.
+ */
+export const DEFAULT_DIRECT_RULES: DirectRule[] = [
+  {
+    id: "builtin-cn-suffix",
+    kind: "domain-suffix",
+    value: "cn",
+    enabled: true,
+    source: "builtin",
+    updatedAt: 0,
+  },
+];
+
+/**
  * Complete extension settings persisted in browser.storage.local.
  */
 export interface Settings {
@@ -348,6 +402,15 @@ export interface Settings {
    * pattern wins. Never sent to pages — only the resolved values are.
    */
   siteLocations: SiteLocation[];
+  /**
+   * Mainland-direct rules: when `directRulesEnabled` is true and a rule
+   * matches a tab's top-level host, that tab is not spoofed at all.
+   * Applied in stage 2, after manual site locations and before the main
+   * location; see `src/shared/rules/direct-rules.ts`.
+   */
+  directRulesEnabled: boolean;
+  /** Direct rules, canonicalized by `validateDirectRules` on load. */
+  directRules: DirectRule[];
 }
 
 /**
@@ -388,4 +451,6 @@ export const DEFAULT_SETTINGS: Settings = {
   precisionCadence: "never",
   localeSpoofing: { mode: "off" },
   siteLocations: [],
+  directRulesEnabled: true,
+  directRules: DEFAULT_DIRECT_RULES,
 };

@@ -100,6 +100,7 @@ GeoSpoof overrides every one of those channels so your browser reports a consist
 - **Full signal alignment** — geolocation, timezone, Date APIs, Intl, Temporal, and WebRTC all report the same place.
 - **Reported Language (opt-in)** — optionally report a language to match, so `navigator.language`, every `Intl` format, and the `Accept-Language` header agree instead of announcing where you actually come from.
 - **Per-site locations** — give specific sites their own location (say, `twitch.tv` in one place and `chatgpt.com` in another) while every other site keeps your main location. Set it under **Per-site locations** at the bottom of the popup's Filters tab. Free on Firefox and Chrome; part of GeoSpoof Pro on Safari. See the [User Guide](docs/USER_GUIDE.md#per-site-locations).
+- **Mainland direct rules (this fork)** — sites on your mainland list are _not_ spoofed: they see your real location and timezone, while every other site keeps your main location. See [Mainland direct rules](#mainland-direct-rules-this-fork) below.
 - **Anti-fingerprinting** — overrides are disguised to pass native code checks used by real-world fingerprinting scripts.
 - **Cross-browser** — Firefox, Chrome, Brave, Edge, and Safari. Single codebase, MV3.
 
@@ -115,6 +116,24 @@ GeoSpoof is designed to work alongside a VPN, not replace one.
 - Does NOT give a site a different IP, account region, or legal residence through per-site locations — it changes only what that site's pages read from your browser
 - Does NOT track your browsing activity, collect telemetry, or store data on external servers. Some features (city search, VPN sync) call third-party APIs to function. See the [Privacy Policy](PRIVACY_POLICY.md) for exactly what's sent and to whom.
 - Does NOT provide forensic-level anti-fingerprinting. Engine-level API tampering is also detectable by dedicated tools. For extreme threat models, use [Tor Browser](https://www.torproject.org/) or [Mullvad Browser](https://mullvad.net/browser) instead.
+
+## Mainland direct rules (this fork)
+
+If you live behind a VPN, mainland sites that expect your real location (banking, local services, anything that checks you are really where your IP says) break when they are spoofed. This fork adds a per-tab off-switch: a tab matching a mainland rule is not spoofed at all — geolocation, timezone, `Intl`, workers, and `Accept-Language` all stay real — while every other tab keeps your main location. The global switch is untouched, and switching from a mainland site to an overseas site restores spoofing on the next load.
+
+Set it in the popup's **Filters** tab, under **Mainland direct rules**: one switch, one text box, one Save button. Paste one rule per line:
+
+```
+cn
+baidu.com
+DOMAIN-SUFFIX,qq.com
+DOMAIN-KEYWORD,weibo
+IP-CIDR,223.5.5.0/24
+```
+
+A bare domain matches the site and its subdomains; `*.example.com` matches subdomains only; an `IP-CIDR` rule matches only when the URL itself is an IPv4 literal. A manual per-site location still wins over a rule for the same site. Lines starting with `!`, `#`, or `//` are comments; unsupported types (`GEOIP`, `GEOSITE`, …) are counted as invalid on save, not silently ignored.
+
+Limits, by design: rules are local text only (no remote subscriptions); the server's IP is never resolved, so a domain is matched by its name, not by where it is hosted; and this is location and timezone only, not a proxy — your IP still comes from your VPN.
 
 ## Reported Language (opt-in)
 

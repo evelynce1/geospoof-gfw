@@ -12,11 +12,13 @@ import type {
 } from "@/shared/types/settings";
 import {
   DEFAULT_ACCURACY_M,
+  DEFAULT_DIRECT_RULES,
   DEFAULT_SETTINGS,
   MIN_PRECISION_RADIUS_M,
   MAX_PRECISION_RADIUS_M,
   MAX_FAVORITES,
 } from "@/shared/types/settings";
+import { validateDirectRules } from "@/shared/rules/direct-rules";
 import { isSupportedLocale } from "@/shared/i18n/locales";
 import { validateLocaleSpoofing } from "@/shared/locale/resolver";
 import { validatePrecisionCadence } from "@/shared/precision/cadence";
@@ -41,6 +43,13 @@ export { validateLocaleSpoofing };
  * Safari app bridge adopts lists through it too.
  */
 export { validateSiteLocations };
+
+/**
+ * Re-exported for the same reason: the implementation lives in
+ * `shared/rules/direct-rules.ts` next to the grammar it re-parses, and
+ * the popup (stage 3) and the resolver (stage 2) validate through it too.
+ */
+export { validateDirectRules };
 
 const logger = createLogger("BG");
 
@@ -458,6 +467,16 @@ export function validateSettings(settings: Partial<Settings>): Settings {
   // entries (bad coordinates, fallback zones, unknown kinds, patterns another
   // entry already claims). Absent repairs to [] with no version bump.
   validated.siteLocations = validateSiteLocations(settings.siteLocations);
+
+  // directRules (geospoof-gfw stage 1): the switch repairs to true, the
+  // list repairs through validateDirectRules. An absent list (pre-fork
+  // installs, or a fresh settings object) gets the built-in defaults;
+  // an explicitly stored [] stays [] — the user really deleted them all.
+  validated.directRulesEnabled =
+    typeof settings.directRulesEnabled === "boolean" ? settings.directRulesEnabled : true;
+  validated.directRules = Array.isArray(settings.directRules)
+    ? validateDirectRules(settings.directRules)
+    : DEFAULT_DIRECT_RULES.map((rule) => ({ ...rule }));
 
   return validated;
 }

@@ -41,6 +41,8 @@ export function makeCadenceSettings(overrides?: Partial<Settings>): Settings {
     precisionCadence: "hour",
     localeSpoofing: { mode: "off" },
     siteLocations: [],
+    directRulesEnabled: true,
+    directRules: [],
     ...overrides,
   };
 }

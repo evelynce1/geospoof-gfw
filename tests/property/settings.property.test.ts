@@ -86,6 +86,8 @@ const settingsArb: fc.Arbitrary<Settings> = fc.record({
   // Locale resolution/validation is covered by locale-resolver.property.test.ts.
   localeSpoofing: fc.constant({ mode: "off" as const }),
   siteLocations: fc.constant([]),
+  directRulesEnabled: fc.constant(true),
+  directRules: fc.constant([]),
 });
 
 /** The keys that MUST NOT appear in the broadcast payload. */

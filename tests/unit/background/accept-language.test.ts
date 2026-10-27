@@ -52,6 +52,8 @@ function makeSettings(overrides?: Partial<Settings>): Settings {
     precisionCadence: "never" as const,
     localeSpoofing: { mode: "off" as const },
     siteLocations: [],
+    directRulesEnabled: true,
+    directRules: [],
     ...overrides,
   };
 }
@@ -198,6 +200,8 @@ describe("site locations", () => {
     makeSettings({
       localeSpoofing: { mode: "match" },
       siteLocations: [ENTRY_DUBLIN, ENTRY_MEXICO_CITY],
+      directRulesEnabled: true,
+      directRules: [],
       ...overrides,
     });
   const TABS = [

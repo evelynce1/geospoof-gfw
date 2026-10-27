@@ -614,7 +614,10 @@ function computeConflict(): EditorState["conflict"] {
   if (!tabUrl || isRestrictedUrl(tabUrl)) return null;
   const mode = settings.scopeMode;
   if (mode !== "allowlist" && mode !== "denylist") return null;
-  if (resolveSiteSettings({ ...settings, enabled: true }, tabUrl, isRestrictedUrl).enabled) {
+  const resolution = resolveSiteSettings({ ...settings, enabled: true }, tabUrl, isRestrictedUrl);
+  if (resolution.enabled || resolution.directRule !== null) {
+    // Enabled: no conflict. Direct-rule off: not a Filters conflict, so
+    // the "add to allowlist" hint must not appear for a direct-rule tab.
     return null;
   }
   const { patterns } = parsePatternsField(

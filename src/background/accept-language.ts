@@ -313,7 +313,11 @@ export function planAcceptLanguageRules(
     if (value === null) {
       // Only an in-scope tab is excluded: a restricted tab (a new tab's blank
       // page) stays under the global rule so its first navigation is covered.
-      if (layered && resolveSiteSettings(settings, tab.url, isRestrictedUrl).enabled) {
+      // A mainland-direct tab is in-scope for Filters but spoofing-off, so
+      // it must also be excluded, or it would keep the global spoofed
+      // header while its page reports the real locale.
+      const resolution = resolveSiteSettings(settings, tab.url, isRestrictedUrl);
+      if (layered && (resolution.enabled || resolution.directRule !== null)) {
         noLocaleTabIds.push(tab.id);
       }
       continue;

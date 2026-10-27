@@ -32,8 +32,11 @@ import type {
   SaveSiteLocationPayload,
   RemoveSiteLocationPayload,
   SiteLocationResponse,
+  SetDirectRulesPayload,
+  DirectRulesResponse,
 } from "@/shared/types/messages";
 import type {
+  DirectRule,
   LocationName,
   PrecisionCadence,
   Settings,
@@ -41,10 +44,12 @@ import type {
   Timezone,
 } from "@/shared/types/settings";
 import {
+  MAX_DIRECT_RULES,
   MAX_FAVORITES,
   MAX_PATTERNS_PER_SITE_LOCATION,
   MAX_SITE_LOCATIONS,
 } from "@/shared/types/settings";
+import { parseDirectRulesText } from "@/shared/rules/direct-rules";
 import {
   normalizeSiteLocationLabel,
   normalizeSiteLocationName,
@@ -364,6 +369,9 @@ export async function handleMessage(
 
       case "REMOVE_SITE_LOCATION":
         return await handleRemoveSiteLocation(message.payload as RemoveSiteLocationPayload);
+
+      case "SET_DIRECT_RULES":
+        return await handleSetDirectRules(message.payload as SetDirectRulesPayload);
 
       default:
         logger.warn("Unknown message type:", message.type);
@@ -1021,6 +1029,78 @@ export async function handleSaveSiteLocation(
   await updateBadge();
   await syncDebuggerSpoofing(updated);
   return { success: true, id };
+}
+
+/**
+ * SET_DIRECT_RULES handler (geospoof-gfw, stage 3): replace the whole
+ * direct-rule list from the popup's text box.
+ *
+ * The background re-parses the text — never trusting a popup-side parse —
+ * dedupes, caps, and stores it, then broadcasts, re-badges, and re-syncs
+ * CDP like every other settings save. The built-in `.cn` rule keeps its
+ * id and source when the pasted text still contains it, so it stays
+ * recognizable as built-in rather than turning into a fresh local rule
+ * on every save. Saving empty text stores an empty list (the user really
+ * deleted them all); it does not resurrect the defaults.
+ */
+export async function handleSetDirectRules(
+  payload: SetDirectRulesPayload
+): Promise<DirectRulesResponse> {
+  if (!payload || typeof payload.enabled !== "boolean" || typeof payload.text !== "string") {
+    return { error: "INVALID_PAYLOAD" };
+  }
+  const parsed = parseDirectRulesText(payload.text);
+  const settings = await loadSettings();
+  const builtin = settings.directRules.find((rule) => rule.id === "builtin-cn-suffix");
+  const now = Date.now();
+  const rules: DirectRule[] = [];
+  let truncated = 0;
+  for (const entry of parsed.entries) {
+    if (rules.length >= MAX_DIRECT_RULES) {
+      truncated += 1;
+      continue;
+    }
+    if (entry.kind === "domain-suffix" && entry.value === "cn" && builtin !== undefined) {
+      rules.push({ ...builtin, updatedAt: now });
+      continue;
+    }
+    if (entry.kind === "domain-suffix" && entry.value === "cn") {
+      rules.push({
+        id: "builtin-cn-suffix",
+        kind: "domain-suffix",
+        value: "cn",
+        enabled: true,
+        source: "builtin",
+        updatedAt: now,
+      });
+      continue;
+    }
+    rules.push({
+      id: `direct-${now}-${rules.length}`,
+      kind: entry.kind,
+      value: entry.value,
+      enabled: true,
+      source: "local",
+      updatedAt: now,
+    });
+  }
+  let updated: Settings;
+  try {
+    updated = await updateSettings({ directRulesEnabled: payload.enabled, directRules: rules });
+  } catch {
+    return { error: "STORAGE_ERROR" };
+  }
+  await broadcastSettingsToTabs(updated);
+  await updateBadge();
+  await syncDebuggerSpoofing(updated);
+  return {
+    success: true,
+    saved: rules.length,
+    invalid: parsed.invalidLines.length,
+    skipped: parsed.skippedLines,
+    duplicates: parsed.duplicateLines.length,
+    truncated,
+  };
 }
 
 /**

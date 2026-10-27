@@ -45,7 +45,8 @@ export type MessageType =
   | "SET_PRECISION_CADENCE"
   | "SET_LOCALE_SPOOFING"
   | "SAVE_SITE_LOCATION"
-  | "REMOVE_SITE_LOCATION";
+  | "REMOVE_SITE_LOCATION"
+  | "SET_DIRECT_RULES";
 
 /**
  * Generic message structure for runtime messaging.
@@ -366,3 +367,32 @@ export type SiteLocationResponse =
       /** The entry that already owns `pattern` (PATTERN_IN_USE). */
       ownerId?: string;
     };
+
+// --- Mainland-direct rule payload and response types (geospoof-gfw) ---
+
+/**
+ * Replace the whole direct-rule list from the popup's text box. The
+ * background re-parses the text, so the popup sends raw text, never
+ * pre-built rules: a popup-side parser bug could otherwise store rules
+ * the background matcher would reject.
+ */
+export interface SetDirectRulesPayload {
+  enabled: boolean;
+  text: string;
+}
+
+export type DirectRulesResponse =
+  | {
+      success: true;
+      /** Rules stored after parsing, deduping, and capping. */
+      saved: number;
+      /** Lines present but not usable (unsupported type, bad IP, …). */
+      invalid: number;
+      /** Comment, blank, header, and `@@` lines. */
+      skipped: number;
+      /** Lines dropped as duplicates of an earlier rule. */
+      duplicates: number;
+      /** Parsed rules dropped because the list is capped. */
+      truncated: number;
+    }
+  | { error: "INVALID_PAYLOAD" | "STORAGE_ERROR" };

@@ -13,6 +13,7 @@ import { t } from "./i18n";
 import { renderFavorites } from "./favorites";
 import { renderScope, renderScopeLoadError } from "./scope";
 import { renderSiteLocations } from "./site-locations";
+import { renderDirectRules } from "./direct-rules";
 import { reflectEarlyProtectionState } from "./early-protection";
 import { reflectDebuggerModeState } from "./debugger-mode";
 import { restoreAccuracyControl } from "./accuracy";
@@ -104,6 +105,7 @@ export async function loadSettings(preloaded?: Settings): Promise<void> {
 
     renderScope(settings, proLocked);
     const siteLocationApplies = await renderSiteLocations(settings, proLocked);
+    renderDirectRules(settings);
 
     // Preserve-location-prompts is Pro-gated on iOS Safari (parity with custom
     // accuracy / per-site filtering). For a non-Pro user the background already

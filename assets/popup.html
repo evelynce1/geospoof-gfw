@@ -731,6 +731,49 @@
           <div class="scope-list" id="scopeList" role="list" aria-label="Scoped sites"></div>
         </div>
 
+        <!-- Mainland-direct rules (geospoof-gfw): a tab matching one of
+             these rules is NOT spoofed — it sees the real location and
+             timezone — while every other tab keeps the main location.
+             Minimal editor on purpose: one switch, one text box, one
+             Save. No per-rule controls, no file import/export. -->
+        <hr class="section-divider" />
+        <div class="direct-rules-section" id="directRulesSection">
+          <div class="section-heading">Mainland direct rules</div>
+          <p class="direct-rules-desc">
+            Sites matching these rules are not spoofed: they see your real location and timezone.
+            Other sites keep the main location. A manual per-site location still wins over a rule
+            for the same site.
+          </p>
+          <label class="toggle-label" for="directRulesToggle">
+            <span>Turn off spoofing on mainland sites</span>
+            <input type="checkbox" id="directRulesToggle" />
+          </label>
+          <label class="site-location-label" for="directRulesTextarea">Rules, one per line</label>
+          <textarea
+            id="directRulesTextarea"
+            rows="8"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="baidu.com&#10;DOMAIN-SUFFIX,qq.com&#10;DOMAIN-KEYWORD,weibo&#10;IP-CIDR,223.5.5.0/24"
+          ></textarea>
+          <div class="direct-rules-hint">
+            A bare domain matches the site and its subdomains. *.example.com matches subdomains
+            only. Lines starting with !, #, or // are comments. GEOIP, GEOSITE, and other rule types
+            are not supported and are counted as invalid. Click Save to apply the switch and the
+            text together.
+          </div>
+          <div class="direct-rules-actions">
+            <button type="button" id="directRulesSave">Save rules</button>
+            <span class="direct-rules-count" id="directRulesCount"></span>
+          </div>
+          <div
+            class="scope-inline-msg"
+            id="directRulesStatus"
+            role="status"
+            style="display: none"
+          ></div>
+        </div>
+
         <!-- Per-site locations (#177): optional and secondary, so a collapsed disclosure
              at the bottom of the tab. Filters decide WHETHER GeoSpoof is on for a
              site; a site location decides WHICH location it reports there. Native
