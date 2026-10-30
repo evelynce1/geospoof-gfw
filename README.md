@@ -148,6 +148,6 @@ npm run build:chromium   # Chromium 构建，产物在 dist/
 ## 相关链接
 
 - 上游项目：<https://github.com/GeoSpoof/geospoof>
-- 英文文档：[README.md](README.md)
+- 英文文档：[README.md](README-en.md)
 - 用户指南：[docs/USER_GUIDE.md](docs/USER_GUIDE.md)
 - 隐私政策：[PRIVACY_POLICY.md](PRIVACY_POLICY.md)
