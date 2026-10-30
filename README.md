@@ -1,9 +1,7 @@
 # GeoSpoof 中文说明（geospoof-gfw）
 
 > 本仓库是上游 [GeoSpoof](https://github.com/GeoSpoof/geospoof) 的 fork。
-> 英文完整文档见 [README.md](README.md)。本文件只讲本 fork 新增的功能和用法，
 > 其余功能（VPN 同步、分站位置、语言、指纹防护等）与上游一致。
-
 ## 它是干什么的
 
 VPN 只改 IP，浏览器还会通过定位 API、时区、`Intl`、WebRTC 等信号泄露真实位置。
